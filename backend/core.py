@@ -38,6 +38,16 @@ class GSResearchDownloader:
         }
         self.options.add_experimental_option("prefs", prefs)
         
+        # Headless mode for Streamlit Cloud / Linux
+        # Use simple heuristic: if os.name != 'nt' (Windows) assume headless, or check for specific env vars
+        # Streamlit Cloud usually runs on Linux
+        if os.name != 'nt' or os.environ.get("HEADLESS_MODE") == "true":
+            self.options.add_argument("--headless=new")
+            self.options.add_argument("--no-sandbox")
+            self.options.add_argument("--disable-dev-shm-usage")
+            self.options.add_argument("--disable-gpu")
+            self.options.add_argument("--window-size=1920,1080")
+        
         # Initialize driver
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
         self.wait = WebDriverWait(self.driver, 20)
