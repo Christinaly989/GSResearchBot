@@ -1,0 +1,129 @@
+/**
+ *  Simple redirect to Marquee if you're accessing a page on RGC and you're opted into Marquee experience
+ *
+ */
+(function (document) {
+    let isGSNow = document.cookie.indexOf("source=mobile") > -1;
+
+    "use strict";
+
+    const MQ_DOMAIN_DEV = "marquee-dev.web.gs.com";
+    const MQ_DOMAIN_QA = "marquee-qa.gs.com";
+    const MQ_DOMAIN_PROD = "marquee.gs.com";
+
+    const PUBLISHING_DOMAIN_DEV = "publishing-dev.gir.site.gs.com";
+    const PUBLISHING_DOMAIN_QA = "publishing-qa.gs.com";
+    const PUBLISHING_DOMAIN_PROD = "publishing.gs.com";
+
+    const MQ_HOSTNAME_PATTERN = /^(?:web-(?:ln|ny|hk)\.)?marquee(?:-(?:alpha|alpha-ext|dev|dev-ext|qa))?(?:\.web)?.gs.com$/i;
+
+    async function main() {
+      //only redirect to Marquee if you're not already on a Marquee domain
+      if (!isGSNow && !MQ_HOSTNAME_PATTERN.test(document.location.host || document.location.hostname)) {
+        if(window.ContextHub !== undefined) {
+          const store = window.ContextHub.getStore("clientprofile");
+          if (Object.keys(store.getTree()).length) {
+            redirectIfOptedIn(store);
+          } else {
+            ContextHub.eventing.once(
+              window.ContextHub.Constants.EVENT_STORE_UPDATED + ':clientprofile',
+              function(store) {
+                redirectIfOptedIn(store);
+              }
+            );
+          }
+        } else if(window.isForge) {
+          const clientProfileStringFromLocalStorage = await window.getClientProfile();
+          if(clientProfileStringFromLocalStorage) { // Currently only available via Forge since Forge doesn't use ContextHub
+            redirectBasedOnLocalStorageData(clientProfileStringFromLocalStorage);
+          } else {
+            console.log("Profile is not available in localstorage or contextHub so Marquee redirection will not happen")
+          }
+        }
+
+      }
+    }
+
+    function redirectBasedOnLocalStorageData(clientProfile) {
+      if(clientProfile !== null) {
+        const hasMarqueeExperience = clientProfile.hasMarqueeExperience;
+        const contactSource = clientProfile.contactSource;
+
+        if("secdiv_marquee" === contactSource && hasMarqueeExperience !== null) { // Only applicable for secdiv users
+          if(hasMarqueeExperience) {
+            if(getOrSetMqExpCookie(hasMarqueeExperience)) {
+              // Same as AEM stack logic: Set MQ cookie to true if not already set and redirect the user.
+              // Redirect to Marquee if cookie is set to true
+              setRedirectLocation();
+            } else {
+              // Same as AEM stack logic: Marquee Experience Cookie has been set to false
+              // but Forge local store is showing true: reset store. No redirection
+              window.updateClientProfile(); // Call window function set by Forge stack
+            }
+          } else if(!hasMarqueeExperience && document.cookie.indexOf("hasMQExp=true") > -1) {
+            // Forge specific logic: Marquee Experience Cookie has been set to true but Forge local store is showing false: reset store
+            // This is added because when profile is updated from alerts page, Forge localStore doesn't get updated so we rely on cookie to communicate this info.
+            window.updateClientProfile(); // Call window function set by Forge stack
+          }
+        }
+      }
+    }
+
+    function setRedirectLocation() {
+      const redirectLocation = transformLocation();
+      if (redirectLocation !== document.location.href) {
+        window.location.href = redirectLocation;
+      }
+    }
+
+    function redirectIfOptedIn(store) {
+      if(store !== null) {
+        const hasMarqueeExperience = store.getItem("hasMarqueeExperience");
+        const contactSource = store.getItem("contactSource");
+
+        if (hasMarqueeExperience !== null && hasMarqueeExperience &&
+          contactSource !== null && contactSource === "secdiv_marquee") {
+          if(getOrSetMqExpCookie(hasMarqueeExperience)) {
+            setRedirectLocation();
+          } else {
+            // Marquee Experience Cookie has been set to false
+            // but the local store is showing true: reset store
+            store.reset();
+          }
+        }
+
+      }
+    }
+
+    function getOrSetMqExpCookie(hasMarqueeExperience) {
+      if(document.cookie.indexOf("hasMQExp=false") > -1) {
+        return false;
+      } else if(document.cookie.indexOf("hasMQExp=true") > -1) {
+        return true
+      } else {
+        document.cookie="hasMQExp=" + hasMarqueeExperience + ";domain=.gs.com;path=/content";
+        return hasMarqueeExperience;
+      }
+    }
+
+    function transformLocation() {
+        const documentUrl = new URL(document.location.href);
+        switch(documentUrl.hostname) {
+            case PUBLISHING_DOMAIN_DEV:
+                documentUrl.hostname = MQ_DOMAIN_DEV;
+                break;
+            case PUBLISHING_DOMAIN_QA:
+                documentUrl.hostname = MQ_DOMAIN_QA;
+                break;
+            case PUBLISHING_DOMAIN_PROD:
+                documentUrl.hostname = MQ_DOMAIN_PROD;
+                break;
+            default:
+                break;
+        }
+        return documentUrl.toString();
+    }
+
+    main();
+  }
+)(document);

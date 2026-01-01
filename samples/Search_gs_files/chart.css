@@ -1,0 +1,462 @@
+.aurora-brush-x {
+	height: 100%;
+	width: 100%;
+}
+
+.aurora-brush-x-brush .handle-custom line {
+	stroke: #6a95c7;
+	stroke-dasharray: 5, 5;
+}
+
+.aurora-brush-x-brush .handle-custom circle {
+	fill: #fff;
+	stroke-width: 2px;
+	stroke: #6a95c7;
+}
+
+.aurora-brush-x-brush .handle-custom circle.active {
+	fill: #6a95c7;
+}
+
+.aurora-brush-x-brush .selection {
+	fill: none;
+	stroke-width: 0;
+}
+
+.aurora-brush-x-axis line {
+	fill: none;
+	stroke: #a4a4a4;
+	shape-rendering: crispEdges;
+}
+
+.aurora-brush-x-axis text {
+	text-anchor: start;
+}
+
+.aurora-brush-x-axis path {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke: #a4a4a4;
+}
+
+.aurora-brush-chart {
+	fill: none;
+}
+
+.aurora-brush-chart-single {
+	fill: rgba(106, 149, 199, 0.25);
+}
+
+.aurora-brush-chart-single path {
+	stroke: #6a95c7;
+}
+
+.aurora-brush-x-navigator-left,
+.aurora-brush-x-navigator-right {
+	fill: #fff;
+	opacity: 0.5;
+}
+
+.aurora-brush-x-navigator-line {
+	stroke: #6a95c7;
+}
+
+.aurora-chart-legend {
+	text-align: center;
+}
+
+.aurora-chart-legend-item {
+	margin-bottom: 12px;
+	margin-bottom: 0.75rem;
+	padding-left: 8px;
+	padding-left: 0.5rem;
+	padding-right: 8px;
+	padding-right: 0.5rem;
+	-webkit-box-align: center;
+	-ms-flex-align: center;
+	align-items: center;
+	display: -webkit-inline-box;
+	display: -ms-inline-flexbox;
+	display: inline-flex;
+}
+
+.aurora-chart-legend-item-color {
+	margin-right: 4px;
+	margin-right: 0.25rem;
+	display: inline-block;
+	height: 15px;
+	vertical-align: middle;
+	width: 15px;
+}
+
+.aurora-chart-legend-item-label {
+	color: rgba(0, 0, 0, 0.54);
+	font-family: Roboto-Bold, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1rem;
+}
+
+.aurora-chart-color-block-legend {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+	-webkit-box-align: center;
+	-ms-flex-align: center;
+	align-items: center;
+}
+
+.aurora-chart-color-block-legend-key,
+.aurora-chart-color-block-legend-left-label {
+	padding-right: 8px;
+	padding-right: 0.5rem;
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1rem;
+	color: rgba(0, 0, 0, 0.54);
+}
+
+.aurora-chart-color-block-legend-right-label {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1rem;
+	color: rgba(0, 0, 0, 0.54);
+	padding-left: 8px;
+	padding-left: 0.5rem;
+}
+
+.aurora-chart-color-block-legend-block {
+	width: 20px;
+	height: 20px;
+	margin-right: 1px;
+}
+
+.aurora-heat-map text {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1rem;
+	color: rgba(0, 0, 0, 0.54);
+}
+
+.aurora-heat-map-cell text {
+	cursor: default;
+}
+
+.aurora-heat-map-cell path {
+	-webkit-transition: stroke 0.2s linear;
+	transition: stroke 0.2s linear;
+}
+
+.aurora-heat-map-cell rect {
+	-webkit-transition: fill-opacity 0.2s linear;
+	transition: fill-opacity 0.2s linear;
+}
+
+.aurora-heat-map-axis text {
+	fill: rgba(0, 0, 0, 0.54);
+}
+
+.aurora-heat-map-axis text.aurora-heat-map-hover-active {
+	fill: rgba(0, 0, 0, 0.87);
+}
+
+.aurora-heat-map-axis text.aurora-heat-map-hover-not-active {
+	fill: rgba(0, 0, 0, 0.26);
+}
+
+.aurora-heat-map-tooltip {
+	border-radius: 2px;
+	padding: 16px;
+	padding: 1rem;
+	z-index: 1060;
+	background: hsla(240, 0%, 42%, 0.9);
+	-webkit-box-shadow: 1px 1px 5px #989898;
+	box-shadow: 1px 1px 5px #989898;
+	display: none;
+	position: fixed;
+}
+
+.aurora-heat-map-tooltip-show {
+	display: block;
+}
+
+.aurora-heat-map-tooltip-title {
+	padding-bottom: 8px;
+	padding-bottom: 0.5rem;
+}
+
+.aurora-heat-map-tooltip-title,
+.aurora-heat-map-tooltip-value {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 1rem;
+	line-height: 1.5rem;
+	color: #fff;
+}
+
+.aurora-heat-map-tooltip-value-suffix {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	color: #fff;
+	padding-left: 4px;
+	padding-left: 0.25rem;
+}
+
+.aurora-heat-map-legend {
+	margin-top: 16px;
+	margin-top: 1rem;
+	margin-bottom: 16px;
+	margin-bottom: 1rem;
+}
+
+.aurora-linechart {
+	height: 100%;
+	width: 100%;
+}
+
+.aurora-linechart-dark-theme {
+	background-color: #0a0a0c;
+}
+
+.aurora-linechart-xaxis-wrapper-dark-theme {
+	stroke-opacity: 0.1;
+}
+
+.aurora-linechart-xaxis-wrapper-dark-theme .tick text {
+	fill: #5b5b5c;
+}
+
+.aurora-linechart-xaxis-wrapper path {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke: #e0e0e0;
+	stroke-width: 1px;
+}
+
+.aurora-linechart-xaxis-wrapper .tick line {
+	display: none;
+}
+
+.aurora-linechart-yaxis-wrapper-dark-theme {
+	stroke-opacity: 0.1;
+}
+
+.aurora-linechart-yaxis-wrapper-dark-theme .tick text {
+	fill: #5b5b5c;
+}
+
+.aurora-linechart-yaxis-wrapper line {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke: #f5f5f6;
+	stroke-width: 1px;
+}
+
+.aurora-linechart-yaxis-wrapper path {
+	display: none;
+}
+
+.aurora-linechart-yaxis-wrapper .baseline line {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke: #313132;
+	stroke-width: 1px;
+}
+
+.aurora-linechart-xaxis-wrapper text,
+.aurora-linechart-yaxis-wrapper text {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.625rem;
+	line-height: 1rem;
+	fill: rgba(0, 0, 0, 0.54);
+}
+
+.aurora-linechart-guideline-wrap-line {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke: #313132;
+	stroke-width: 1px;
+	stroke-dasharray: 2, 2;
+}
+
+.aurora-linechart-guideline-wrap-line-dark-theme {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke: #f5f5f6;
+	stroke-width: 1px;
+}
+
+.aurora-linechart-guideline-wrap-line-wrap {
+	opacity: 0;
+}
+
+.aurora-linechart-guideline-wrap-line-wrap-active {
+	opacity: 1;
+}
+
+.aurora-linechart-interactive-right-rect {
+	fill: #fff;
+	opacity: 0.7;
+}
+
+.aurora-linechart-interactive-right-rect-dark-theme {
+	opacity: 0.1;
+}
+
+.aurora-linechart-interactive-tooltip {
+	opacity: 0;
+}
+
+.aurora-linechart-interactive-tooltip-active {
+	opacity: 0.7;
+}
+
+.aurora-linechart-interactive-tooltip-rect {
+	fill: #0a0a0c;
+}
+
+.aurora-linechart-interactive-tooltip-rect-dark-theme {
+	fill: #313132;
+}
+
+.aurora-linechart-interactive-tooltip-text {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.625rem;
+	line-height: 1rem;
+	fill: #fff;
+}
+
+.aurora-linechart-interactive-layer {
+	opacity: 0;
+}
+
+.aurora-linechart-annotation-text {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.625rem;
+	line-height: 1rem;
+	fill: #fff;
+}
+
+.aurora-linechart-series {
+	fill: none;
+}
+
+.aurora-linechart-annotation-x-lines-line,
+.aurora-linechart-annotation-y-lines-line {
+	fill: none;
+	shape-rendering: crispEdges;
+	stroke-width: 1px;
+	stroke-dasharray: 2, 2;
+}
+
+.aurora-linechart-annotation-x-lines-line-text,
+.aurora-linechart-annotation-y-lines-line-text {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.75rem;
+	line-height: 1rem;
+}
+
+.aurora-linechart-annotation-x-lines-line-text-hide,
+.aurora-linechart-annotation-y-lines-line-text-hide {
+	display: none;
+}
+
+.aurora-linechart-annotation-x-lines-text,
+.aurora-linechart-annotation-y-lines-text {
+	font-family: Roboto-Regular, sans-serif;
+	font-size: 0.625rem;
+	line-height: 1rem;
+	fill: #fff;
+}
+
+.aurora-linechart-annotation-x-lines-text-hide,
+.aurora-linechart-annotation-y-lines-text-hide {
+	display: none;
+}
+
+.aurora-linechart-annotation-x-lines-flag-hide,
+.aurora-linechart-annotation-y-lines-flag-hide {
+	display: none;
+}
+
+.aurora-spark-lines-line {
+	width: 100%;
+	height: 100%;
+}
+
+.aurora-spark-lines-line-base-line {
+	shape-rendering: crispEdges;
+	stroke: #cccccb;
+	stroke-width: 1;
+}
+
+.aurora-spark-lines-line-down-area {
+	stroke: none;
+	fill: rgba(211, 45, 71, 0.5);
+}
+
+.aurora-spark-lines-line-down-line {
+	fill: none;
+	stroke: #d32d47;
+}
+
+.aurora-spark-lines-line-down-marker {
+	stroke: none;
+	fill: #d32d47;
+}
+
+.aurora-spark-lines-line-up-area {
+	stroke: none;
+	fill: rgba(76, 175, 80, 0.5);
+}
+
+.aurora-spark-lines-line-up-line {
+	fill: none;
+	stroke: #4caf50;
+}
+
+.aurora-spark-lines-line-up-marker {
+	stroke: none;
+	fill: #4caf50;
+}
+
+.gs-chart {
+	&__wrapper {
+		width: 100%;
+		height: 300px;
+	}
+
+	&__brush-wrapper {
+		width: 100%;
+		height: 80px;
+		padding-right: 50px;
+	}
+
+	.aurora-linechart-annotation-y-lines-text {
+		fill: #000;
+		transform: translateX(0);
+	}
+
+	.aurora-linechart-annotation-y-lines-line {
+		stroke-dasharray: 4, 0, 4;
+		stroke-width: 2px;
+	}
+
+	.aurora-linechart-annotation-y-lines-flag {
+		path {
+			fill: transparent;
+			display: none;
+		}
+	}
+
+	.aurora-linechart-annotation-y-lines-box {
+		fill: #fff;
+	}
+
+	.aurora-linechart-annotation {
+		display: none;
+	}
+
+	.aurora-linechart-annotation:first-child {
+		display: block;
+	}
+}

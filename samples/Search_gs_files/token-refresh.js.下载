@@ -1,0 +1,96 @@
+const REFRESH_EXPIRY_MARGIN_MS = 90000; // 1.5 mins buffer
+const BACKGROUND_REFRESH_INTERVAL_MS = 150000; // 2.5 mins periodic refresh
+const SESSION_STORAGE_JWT_KEY = "girJwt";
+const sleep = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
+
+/**
+ * Attempt to refresh the jwt by fetching from the provided endpoint
+ * @param endpoint Endpoint to be used for the token exchange
+ * @returns stored jwt object if it was successfully refreshed, undefined otherwise
+ */
+async function refreshJwtWithEndpoint(endpoint) {
+    try {
+        const response = await fetch(endpoint, { redirect: "manual" });
+        if (response.status === 200) {
+            const result = await response.json();
+            const storedJwt = { access_token: result.access_token, expiry: Date.now() + result.expires_in * 1000 };
+            sessionStorage.setItem(SESSION_STORAGE_JWT_KEY, JSON.stringify(storedJwt));
+            return storedJwt;
+        } else if (response.status >= 400 && response.status < 500) {
+            window.shouldAbortRefresh = true;
+        }
+        console.error(
+            `Failed to refresh token through exchangeEndpoint=${endpoint} with statusCode=${response.status}`
+        );
+    } catch (e) {
+        console.error(`Failed to refresh token through exchangeEndpoint=${endpoint}`, e);
+    }
+
+    return undefined;
+}
+
+/**
+ * Attempt to refresh the jwt through either the session cookie or the access_token cookie as a fallback
+ */
+const refreshJwt = async () => {
+    try {
+        if (window.isForge) {
+            const sessionExchangeJwt = await refreshJwtWithEndpoint("/research/session-exchange");
+            if (sessionExchangeJwt) {
+                return sessionExchangeJwt;
+            }
+            return undefined;
+        }
+
+        const tokenExchangeJwt = await refreshJwtWithEndpoint("/research/token-exchange");
+        if (tokenExchangeJwt) {
+            return tokenExchangeJwt;
+        }
+
+        console.error(`Refresh token failed to be refreshed via session or access_token exchange`);
+    } catch (e) {
+        console.error(`Unexpected error thrown during token refresh`, e);
+    }
+
+    return undefined;
+};
+
+/**
+ * Attempt to refresh the jwt in the background by waiting the provided interval
+ */
+const backgroundRefreshToken = (interval) =>
+    sleep(interval).then(() =>
+        refreshJwt().then(() => {
+            if (!window.shouldAbortRefresh) {
+                backgroundRefreshToken(interval);
+            }
+        })
+    );
+
+window.JwtService = {
+    getJwt: async () => {
+        try {
+            const stringifiedJwt = sessionStorage.getItem(SESSION_STORAGE_JWT_KEY);
+
+            if (stringifiedJwt) {
+                const jwt = JSON.parse(stringifiedJwt);
+
+                if (Date.now() + REFRESH_EXPIRY_MARGIN_MS < jwt.expiry) {
+                    return jwt.access_token;
+                }
+            }
+            return (await refreshJwt())?.access_token;
+        } catch (e) {
+            return (await refreshJwt())?.access_token;
+        }
+    },
+};
+
+refreshJwt();
+backgroundRefreshToken(BACKGROUND_REFRESH_INTERVAL_MS);
+
+const isNode = () => typeof process !== "undefined" && !!process.versions && !!process.versions.node;
+
+if (isNode() && process.env.NODE_ENV === "test") {
+    module.exports = { refreshJwt };
+}

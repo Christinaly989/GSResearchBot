@@ -1,0 +1,8 @@
+selenium
+webdriver-manager
+requests
+streamlit
+fastapi
+uvicorn
+pydantic
+python-multipart
