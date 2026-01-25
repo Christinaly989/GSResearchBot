@@ -3,6 +3,7 @@ import time
 import glob
 import shutil
 import re
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -37,8 +38,28 @@ class GSResearchDownloader:
         }
         self.options.add_experimental_option("prefs", prefs)
         
+        # Headless mode for Streamlit Cloud / Linux
+        # Use simple heuristic: if os.name != 'nt' (Windows) assume headless, or check for specific env vars
+        # Streamlit Cloud usually runs on Linux
+        if os.name != 'nt' or os.environ.get("HEADLESS_MODE") == "true":
+            self.options.add_argument("--headless=new")
+            self.options.add_argument("--no-sandbox")
+            self.options.add_argument("--disable-dev-shm-usage")
+            self.options.add_argument("--disable-gpu")
+            self.options.add_argument("--window-size=1920,1080")
+        
         # Initialize driver
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
+        try:
+            # 尝试自动安装并启动
+            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.options)
+        except Exception:
+            # 如果自动安装失败（常见于 Streamlit Cloud），尝试使用默认系统路径
+            try:
+                self.driver = webdriver.Chrome(options=self.options)
+            except Exception as e:
+                # 再次失败，抛出更清晰的错误信息
+                raise RuntimeError(f"Failed to initialize Chrome Driver. Error: {e}")
+        
         self.wait = WebDriverWait(self.driver, 20)
 
     def log(self, message):
@@ -89,17 +110,48 @@ class GSResearchDownloader:
             self.log("Not on company page yet. Checking for search results...")
             try:
                 # Look for links containing the company name (case insensitive)
-                # This XPath looks for <a> tags containing the ticker text
-                result_link = self.driver.find_element(By.XPATH, f"//a[contains(translate(text(), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{company_ticker.upper()}')]")
-                self.log(f"Found potential result link: {result_link.text}")
-                result_link.click()
+                # First try exact ticker match in brackets often seen in results e.g. "Company Name (TICKER)"
+                # Then try loose match
                 
-                # Wait again for navigation
-                time.sleep(5)
-                if self._is_on_company_page():
-                    self.log("Clicked result and navigated to company page.")
+                # XPath to find <a> tags that contain the ticker text
+                # We'll use a slightly more robust strategy: find ANY link that has the ticker in its text
+                
+                found_link = None
+                
+                # Strategy 1: Look for exact ticker text
+                try:
+                    # Case-insensitive contains
+                    xpath = f"//a[contains(translate(text(), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '{company_ticker.upper()}')]"
+                    links = self.driver.find_elements(By.XPATH, xpath)
+                    if links:
+                        found_link = links[0]
+                except:
+                    pass
+                
+                # Strategy 2: If no link found, maybe it's the first result in a list?
+                # Sometimes the search jumps directly to a "Search Results" list where the first item is the company
+                if not found_link:
+                     # Try to find the first result item's link
+                     try:
+                         first_result = self.driver.find_element(By.CSS_SELECTOR, "div[data-testid='search-item-content'] a")
+                         found_link = first_result
+                         self.log("Fallback: Selecting first search result link.")
+                     except:
+                         pass
+
+                if found_link:
+                    self.log(f"Found potential result link: {found_link.text}")
+                    found_link.click()
+                    
+                    # Wait again for navigation
+                    time.sleep(5)
+                    if self._is_on_company_page():
+                        self.log("Clicked result and navigated to company page.")
+                    else:
+                        self.log("Clicked link but still not detecting company page elements.")
                 else:
-                    self.log("Clicked link but still not detecting company page elements.")
+                    self.log("Could not find a specific link for this ticker. Assuming we are on the correct page or results list.")
+                    
             except Exception as e:
                 self.log(f"Could not auto-select a company from results: {e}")
                 self.log("Please manually click the correct company if multiple results appear.")
@@ -115,11 +167,13 @@ class GSResearchDownloader:
         except:
             return False
 
-    def download_reports(self, company_name, min_pages=1, primary_only=True):
+    def download_reports(self, company_name, min_pages=1, primary_only=True, days_filter=None, models_only=False):
         """
         Identifies and downloads models and reports.
+        days_filter: int, optional. If set, only download reports from the last N days.
+        models_only: bool, optional. If True, only download the model and skip reports.
         """
-        self.log(f"Attempting to find reports and models for {company_name}...")
+        self.log(f"Attempting to find {'models only' if models_only else 'reports and models'} for {company_name}...")
         
         # Create a specific directory for this company
         company_dir = os.path.join(self.download_dir, company_name)
@@ -144,8 +198,12 @@ class GSResearchDownloader:
                 self.log("No Model section found.")
         except Exception as e:
             self.log(f"Error downloading model: {e}")
+            
+        if models_only:
+            self.log("Models only mode enabled. Skipping reports download.")
+            return
     
-        # 3. Download Reports (with Pagination)
+        # 3. Download Reports
         try:
             # 3.1 Click "View More" if available to see all reports
             try:
@@ -171,62 +229,143 @@ class GSResearchDownloader:
             while True:
                 self.log(f"Processing Page {page_num}...")
                 
-                # Check if we are on the Search page (different selectors) or Company page
-                # The Search page items seem to be different.
-                # In the Company page, we used div[data-testid='search-item-content']
-                # Let's check what works on the current page.
-                
-                # Try the original selector first
-                report_containers = self.driver.find_elements(By.CSS_SELECTOR, "div[data-testid='search-item-content']")
-                
-                if not report_containers:
-                    # Fallback for Search Page structure if different (the user didn't provide a clear item selector for Search_gs.html that matched the previous one, 
-                    # but usually they reuse components. If not found, we might need to look for generic links)
-                    self.log("Standard report containers not found. Looking for generic search result items...")
-                    # Based on standard GS search, sometimes items are just in a list
-                    # Let's try to find links that look like reports
+                # Explicit wait for report items to load (especially after pagination)
+                try:
+                    # Wait up to 10 seconds for either grid items or table rows to appear
+                    WebDriverWait(self.driver, 10).until(
+                        lambda d: len(d.find_elements(By.CSS_SELECTOR, "div[data-testid='search-item-content']")) > 0 or \
+                                  len(d.find_elements(By.CLASS_NAME, "SearchResults__colCopy")) > 0
+                    )
+                except:
+                    # If timeout, we just proceed to check (it might be empty really, or already loaded)
                     pass
 
-                self.log(f"Found {len(report_containers)} report items on this page.")
+                # Initialize lists and mode
+                report_items = []
+                mode = "unknown"
                 
-                for i, container in enumerate(report_containers):
-                    # (Existing report processing logic...)
-                    try:
-                        # Extract Link and Title
-                        link_el = container.find_element(By.CSS_SELECTOR, "a")
-                        url = link_el.get_attribute("href")
-                        title = link_el.text
+                # Strategy 1: Grid View (Standard)
+                grid_items = self.driver.find_elements(By.CSS_SELECTOR, "div[data-testid='search-item-content']")
+                if grid_items:
+                    # self.log(f"Found {len(grid_items)} reports in Grid View.")
+                    report_items = grid_items
+                    mode = "grid"
+                else:
+                    # Strategy 2: Table View (Search Results Page)
+                    # Find all rows that have the copy column
+                    # We look for tr that contains .SearchResults__colCopy
+                    table_rows = self.driver.find_elements(By.CSS_SELECTOR, "tr")
+                    for row in table_rows:
+                        if row.find_elements(By.CLASS_NAME, "SearchResults__colCopy"):
+                            report_items.append(row)
+                    
+                    if report_items:
+                        # self.log(f"Found {len(report_items)} reports in Table View.")
+                        mode = "table"
+                
+                if not report_items:
+                    self.log("No report items found in either Grid or Table view on this page.")
+                    # Double check if we are maybe just loading slowly?
+                    # If page > 1 and no items found, maybe we reached end or error?
+                    if page_num > 1:
+                         self.log("Warning: Pagination occurred but no items found on new page.")
+
+                for i, container in enumerate(report_items):
+                    if processed_count >= 1000: # Global limit increased
+                        break
                         
+                    try:
+                        url = ""
+                        title = ""
+                        page_count = 0
+                        container_text = container.text # For prefix check
+                        report_date = None
+                        
+                        if mode == "grid":
+                            # Extract Link and Title (Grid)
+                            link_el = container.find_element(By.CSS_SELECTOR, "a")
+                            url = link_el.get_attribute("href")
+                            title = link_el.text
+                            
+                            # Extract Metadata (Page Count)
+                            try:
+                                metadata_el = container.find_element(By.CSS_SELECTOR, "div[data-testid='search-item-metadata']")
+                                metadata_text = metadata_el.text
+                                pg_match = re.search(r'(\d+)\s*(pg|pp|pages)', metadata_text, re.IGNORECASE)
+                                if pg_match:
+                                    page_count = int(pg_match.group(1))
+                            except:
+                                pass
+                                
+                        elif mode == "table":
+                            # Extract Link and Title (Table)
+                            # Look inside .SearchResults__colCopy
+                            col_copy = container.find_element(By.CLASS_NAME, "SearchResults__colCopy")
+                            link_el = col_copy.find_element(By.TAG_NAME, "a")
+                            url = link_el.get_attribute("href")
+                            title = link_el.text
+                            
+                            # Extract Page Count (Table)
+                            try:
+                                col_pages = container.find_element(By.CLASS_NAME, "SearchResults__colPages")
+                                pg_text = col_pages.text.strip() # e.g. "9"
+                                if pg_text.isdigit():
+                                    page_count = int(pg_text)
+                            except:
+                                pass
+
+                            # Extract Date (Table)
+                            try:
+                                date_el = container.find_element(By.CSS_SELECTOR, ".SearchResults__colDate .SearchResults__hiddenEl")
+                                ts = int(date_el.get_attribute("textContent").strip())
+                                # timestamp is milliseconds
+                                report_date = datetime.fromtimestamp(ts / 1000)
+                            except Exception as e:
+                                # self.log(f"Could not extract date: {e}")
+                                pass
+
                         if not url or "/content/research/en/reports/" not in url:
                             continue
                             
-                        # Check if already processed (to avoid duplicates across pages if any)
-                        # Actually, just relying on processed_count index for naming might be risky if we reset.
-                        # But we use unique file names based on title usually? 
-                        # The current naming uses `processed_count+1`. We should keep incrementing `processed_count`.
-                        
-                        # Extract Metadata (Page Count)
-                        page_count = 0
-                        try:
-                            metadata_el = container.find_element(By.CSS_SELECTOR, "div[data-testid='search-item-metadata']")
-                            metadata_text = metadata_el.text
-                            pg_match = re.search(r'(\d+)\s*(pg|pp|pages)', metadata_text, re.IGNORECASE)
-                            if pg_match:
-                                page_count = int(pg_match.group(1))
-                        except:
-                            pass
-                        
                         # Check Page Count Filter
                         if page_count < min_pages:
+                            # self.log(f"Skipping report '{title[:30]}...' ({page_count} pages < {min_pages})")
                             continue
 
-                        # Determine Prefix
+                        # Check Date Filter
+                        if days_filter and report_date:
+                            cutoff_date = datetime.now() - timedelta(days=days_filter)
+                            if report_date < cutoff_date:
+                                self.log(f"Skipping report '{title[:30]}...' (Date {report_date.date()} older than {days_filter} days)")
+                                continue
+
+                        # Check Duplicate (File Existence)
+                        # Create a safe version of the title to match against existing filenames
+                        # We used to take only first 30 chars, but let's be more robust
+                        # We'll check if the "safe_title" part is contained in any existing filename
+                        safe_title = "".join([c for c in title if c.isalnum() or c in " -_"]).strip()
+                        # Truncate to a reasonable length for filename matching (avoid OS limits but keep enough uniqueness)
+                        match_pattern = safe_title[:50] 
+                        
+                        existing_files = os.listdir(company_dir)
+                        is_duplicate = False
+                        
+                        # Check 1: Filename match (Loose)
+                        for f in existing_files:
+                            if match_pattern in f and f.endswith(".pdf"):
+                                is_duplicate = True
+                                break
+                        
+                        if is_duplicate:
+                            self.log(f"Skipping report '{title[:40]}...' (Already exists in folder)")
+                            continue
+
+                        # Determine Prefix (Rating Change / Initiation)
                         prefix = ""
-                        container_text = container.text
                         if "Initiation" in title or "Initiation" in container_text:
                             prefix = "A_Initiation_"
                         elif "Rating Change" in title or "Rating Change" in container_text:
-                             prefix = "A_Rating_"
+                                prefix = "A_Rating_"
                         
                         full_prefix = f"{prefix}{company_name}_Report_{processed_count+1}"
                         
@@ -235,19 +374,30 @@ class GSResearchDownloader:
                         processed_count += 1
                         
                     except Exception as e:
+                        # self.log(f"Error processing report item {i}: {e}")
                         continue
-
+                        
                 # 3.3 Check for Next Page
                 try:
                     # Selector based on user HTML: <a data-cy="gs-uitk-pagination__nav-link-next" ...>
                     next_btn = None
                     try:
+                        # Capture the first item of the current page to wait for staleness later
+                        first_item_on_current_page = report_items[0] if report_items else None
+
                         # Use the specific data-cy attribute found in HTML
-                        # Also keep fallback to aria-label
+                        # Also keep fallback to aria-label and common classes
                         next_selectors = [
                             "a[data-cy='gs-uitk-pagination__nav-link-next']", 
                             "a[aria-label='Goto next page']",
-                            "//a[contains(text(), 'Next')]"
+                            "a[aria-label='Next page']",
+                            "a.SearchResults__paginationNext",
+                            ".SearchResults__paginationNext",
+                            "//a[contains(text(), 'Next')]",
+                            "//a[contains(text(), '>')]",
+                            "//a[contains(text(), '›')]",
+                            "//span[contains(text(), 'Next')]/parent::a",
+                            "//span[contains(text(), '>')]/parent::a"
                         ]
                         
                         for sel in next_selectors:
@@ -259,9 +409,13 @@ class GSResearchDownloader:
                                 
                                 if els:
                                     # Check visibility and state
-                                    el = els[0]
-                                    if el.is_displayed() and el.get_attribute("aria-disabled") != "true":
-                                        next_btn = el
+                                    # Iterate to find the first visible one
+                                    for el in els:
+                                        if el.is_displayed() and el.get_attribute("aria-disabled") != "true" and "disabled" not in (el.get_attribute("class") or ""):
+                                            next_btn = el
+                                            self.log(f"Found 'Next' button using selector: {sel}")
+                                            break
+                                    if next_btn:
                                         break
                             except:
                                 pass
@@ -279,7 +433,19 @@ class GSResearchDownloader:
                                 self.log("Standard click failed, attempting JS click...")
                                 self.driver.execute_script("arguments[0].click();", next_btn)
                                 
-                            time.sleep(5) # Wait for page load
+                            # Wait for the page to actually reload/change
+                            self.log("Waiting for page content to update...")
+                            if first_item_on_current_page:
+                                try:
+                                    # Wait until the old item is attached to DOM (stale)
+                                    WebDriverWait(self.driver, 15).until(
+                                        EC.staleness_of(first_item_on_current_page)
+                                    )
+                                    self.log("Page update detected (old elements went stale).")
+                                except:
+                                    self.log("Warning: Timed out waiting for page update (staleness).")
+                            
+                            time.sleep(5) # Extra buffer for new elements to render
                             page_num += 1
                         else:
                             self.log("No 'Next' button found or it is disabled/hidden. Finished all pages.")
@@ -332,9 +498,10 @@ class GSResearchDownloader:
         except Exception as e:
             self.log(f"Failed to download via click: {e}")
 
-    def _download_report_pdf(self, report_url, report_title, target_dir, company_name, index):
+    def _download_report_pdf(self, report_url, report_title, target_dir, file_prefix, index):
         """
         Navigates to report page and attempts to download PDF.
+        file_prefix: The prefix string passed from caller (e.g. "0291HK_Report_1")
         """
         original_window = self.driver.current_window_handle
         
@@ -366,8 +533,16 @@ class GSResearchDownloader:
                     
                     if element:
                         self.log(f"Found PDF link on report page.")
-                        safe_title = "".join([c for c in report_title if c.isalnum() or c in " -_"]).strip()[:30]
-                        self._click_and_download(element, target_dir, f"{company_name}_Report_{index}_{safe_title}")
+                        # Use same safe_title logic as in check loop to ensure consistency
+                        safe_title = "".join([c for c in report_title if c.isalnum() or c in " -_"]).strip()
+                        # Limit to prevent OS path length issues but ensure it covers the match_pattern length
+                        safe_title_filename = safe_title[:100] 
+                        
+                        # Fix: Avoid double prefixing. The caller already passes "Company_Report_X"
+                        # We just append the title.
+                        final_filename_prefix = f"{file_prefix}_{safe_title_filename}"
+                        
+                        self._click_and_download(element, target_dir, final_filename_prefix)
                         found = True
                         break
                 except:
@@ -487,6 +662,17 @@ class GSResearchDownloader:
             self.log(f"Moved and renamed to: {target_path}")
         except Exception as e:
             self.log(f"Error moving file: {e}")
+
+    def check_watchlist_updates(self, watchlist_manager):
+        """
+        Checks for updates for all tickers in the watchlist.
+        """
+        watchlist = watchlist_manager.get_watchlist()
+        self.log(f"Checking updates for watchlist: {watchlist}")
+        
+        for ticker in watchlist:
+            self.search_company(ticker)
+            self.download_reports(ticker, min_pages=1, primary_only=False, days_filter=30)
 
     def close(self):
         if self.driver:

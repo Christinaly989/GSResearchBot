@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Data (User profiles and watchlists)
+users.db
+watchlist.json
+watchlist_*.json
+
+# Downloads (Reports and models)
+downloads/
+
+# Environment variables
+.env
